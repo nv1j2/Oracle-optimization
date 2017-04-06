@@ -1,0 +1,39 @@
+SQL> select tablespace_name from dba_data_files where file_name='C:\APP\ORACLE\ORADATA\ORCL\SYSTEM01
+.DBF';
+
+host move C:\APP\ORACLE\ORADATA\ORCL\SYSTEM01.DBF Z:\oracle\
+alter database rename file 'C:\APP\ORACLE\ORADATA\ORCL\EXAMPLE01.DBF' to 'Z:\oracle\EXAMPLE01.DBF';
+
+select tablespace_name,file_name,online_status from dba_data_files where tablespace_name='SYSTEM';
+
+recover datafile 'Z:\ORACLE\SYSAUX01.DBF';
+
+TABLESPACE_NAME
+------------------------------------------------------------
+SYSTEM
+
+SQL> select tablespace_name from dba_data_files where file_name='C:\APP\ORACLE\ORADATA\ORCL\SYSAUX01
+.DBF';
+
+TABLESPACE_NAME
+------------------------------------------------------------
+SYSAUX
+
+SQL> select tablespace_name from dba_data_files where file_name='C:\APP\ORACLE\ORADATA\ORCL\UNDOTBS0
+1.DBF';
+
+TABLESPACE_NAME
+------------------------------------------------------------
+UNDOTBS1
+
+SQL> select tablespace_name from dba_data_files where file_name='C:\APP\ORACLE\ORADATA\ORCL\USERS01.DBF';
+
+TABLESPACE_NAME
+------------------------------------------------------------
+USERS
+
+SQL> select tablespace_name from dba_data_files where file_name='C:\APP\ORACLE\ORADATA\ORCL\EXAMPLE01.DBF';
+
+TABLESPACE_NAME
+------------------------------------------------------------
+EXAMPLE

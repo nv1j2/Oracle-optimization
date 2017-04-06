@@ -1,0 +1,440 @@
+oracle中sql语句的优化(转帖)
+
+ 
+
+一、执行顺序及优化细则
+
+1.表名顺序优化
+(1) 基础表放下面,当两表进行关联时数据量少的表的表名放右边
+表或视图:
+Student_info   (30000条数据)
+Description_info (30条数据) 
+select *
+  from description_info di
+      ,student_info     si --学生信息表
+where si.student_id = di.lookup_code(+)
+   and di.lookup_type(+) = 'STUDENT_ID'     
+与   
+select *
+  from student_info     si--学生信息表
+      ,description_info di
+where si.student_id = di.lookup_code(+)
+   and di.lookup_type(+) = 'STUDENT_ID'  
+以student_info作为基础表,你会发现运行的速度会有很大的差距。
+  
+  
+(2) 当出现多个表时,关联表被称之为交叉表,交叉表作为基础表
+select *
+  from description_info di
+    ,description_info di2
+      ,student_info     si --学生信息表
+where si.student_id = di.lookup_code(+)
+   and di.lookup_type(+) = 'STUDENT_ID'
+   and si.school_id = di.lookup_code(+)
+   and di.lookup_type(+) = 'SCHOOL_ID'
+与
+select *
+  from student_info     si--学生信息表
+      ,description_info di
+      ,description_info di2
+where si.student_id = di.lookup_code(+)
+   and di.lookup_type(+) = 'STUDENT_ID'
+   and si.school_id = di.lookup_code(+)
+   and di.lookup_type(+) = 'SCHOOL_ID'
+以student_info作为基础表,你会发现运行的速度会有很大的差距,
+当基础表放在后面,这样的执行速度会明显快很多。
+
+2.where执行顺序
+where执行会从至下往上执行
+select *
+from student_info si --学生信息表
+where si.school_id=10 --学院ID
+and  si.system_id=100--系ID
+摆放where子句时,把能过滤大量数据的条件放在最下边
+
+3. is null 和is not null
+当要过滤列为空数据或不为空的数据时使用
+select *
+from student_info si --学生信息表
+where si.school_id is null(当前列中的null为少数时用is not null,否则is null)
+
+4.使用表别名
+当查询时出现多个表时,查询时加上别名,
+避免出现减少解析的时间字段歧义引起的语法错误。
+
+5. where执行速度比having快
+尽可能的使用where代替having
+select  from student_info si
+group by si.student_id
+having si.system_id!=100
+  and si.school_id!=10
+(select  from student_info si
+wehre si.system_id!=100
+and si.school_id!=10
+group by si.student_id) 
+ 
+6.  * 号引起的执行效率
+尽量减少使用select * 来进行查询,当你查询使用*,
+数据库会进行解析并将*转换为全部列。
+
+
+二、替代优化
+1、用>=替代>
+select ui.user_name
+  from user_info ui--员工信息表
+  where ui.student_id>=10
+  与
+  select ui.user_name
+  from user_info ui--员工信息表
+  where ui.student_id>9
+  执行时>=会比>执行得要快
+ 
+2、用UNION替换OR (适用于索引列)
+select ui.user_name
+  from user_info ui--员工信息表
+  where ui.student_id=10
+  union
+select ui.user_name
+  from user_info ui--员工信息表
+  where ui.student_id=2 
+   上面语句可有效避免全表查询
+   select ui.user_name
+  from user_info ui--员工信息表
+  where ui.student_id=10
+  or ui.student_id=2
+  如果坚持要用OR, 可以把返回记录最少的索引列写在最前面
+   
+3、用in 代替or
+select ui.user_name
+  from user_info ui--员工信息表
+  where ui.student_id=10
+  or ui.student_id=20
+  or ui.student_id=30
+  改成
+  select ui.user_name
+  from user_info ui--员工信息表
+  where ui.student_id in (10,20,30)
+  执行会更有效率
+   
+4、 Union All 与Union
+Union All重复输出两个结果集合中相同记录
+如果两个并集中数据都不一样.那么使用Union All 与Union是没有区别的,
+select ui.user_name
+  from user_info ui--员工信息表
+  where ui.student_id=10
+  union All
+select ui.user_name
+  from user_info ui--员工信息表
+  where ui.student_id=2 
+  与
+  select ui.user_name
+  from user_info ui--员工信息表
+  where ui.student_id=10
+  union
+select ui.user_name
+  from user_info ui--员工信息表
+  where ui.student_id=2 
+但Union All会比Union要执行得快
+
+5、分离表和索引
+总是将你的表和索引建立在另外的表空间内
+决不要将这些对象存放到SYSTEM表空间里
+
+三、一些优化技巧
+
+
+1、计算表的记录数时
+
+select count(si.student_id)
+from Student_info si(student_id为索引)
+与
+select count(*) from Student_info si
+执行时.上面的语句明显会比下面没有用索引统计的语句要快
+
+2.使用函数提高SQL执行速度
+
+当出现复杂的查询sql语名,可以考虑使用函数来提高速度
+查询学生信息并查询学生(李明)个人信息与的数学成绩排名
+如
+select di.description student_name
+      ,(select res.order_num--排名
+         from result res
+        where res.student_id = di.student_id
+        order by result_math) order_num
+  from description_info di
+      ,student_info     si --学生信息表
+where si.student_id = di.lookup_code(+)
+   and di.lookup_type(+) = 'STUDENT_ID'
+   and di.description = '李明'
+  
+而且我们将上面order_num排名写成一个fuction时
+create or replace package body order_num_pkg is
+function order_num(p_student_id number) return_number is
+  v_return_number number;
+begin
+  select res.order_num --排名
+    into v_return_number
+    from result res
+   where res.student_id = di.student_id
+   order by result_math;
+  return v_return_number;
+exception
+  when others then
+    null;
+    return null;
+end;
+end order_num_pkg;
+执行
+select di.description student_name
+      ,order_num_pkg.order_num(di.student_id) order_num
+  from description_info di
+      ,student_info     si --学生信息表
+where si.student_id = di.lookup_code(+)
+   and di.lookup_type(+) = 'STUDENT_ID'
+   and di.description = '李明'
+执行查询时的速度也会有所提高    
+ 
+3.减少访问数据库的次数
+
+执行次数的减少(当要查询出student_id=100的学生和student_id=20的学生信息时)
+select address_id
+from student_info si --学生信息表
+where si.student_id=100
+与
+select address_id
+from student_info si --学生信息表
+where si.student_id=20
+都进行查询.这样的效率是很低的
+而进行
+(
+select si.address_id,si2.address_id
+from student_info si --学生信息表
+,student_info si2
+where si.student_id=100
+and si2.student_id=20
+与
+select decode(si.student_id,100,address_id)
+   ,decode(si.student_id,20,address_id)
+from student_info si
+)
+执行速度是提高了,但可读性反而差了..
+所以这种写法个人并不太推荐
+
+4、用Exists(Not Exists)代替In(Not In)
+
+   在执行当中使用Exists或者Not Exists可以高效的进行查询
+
+5、Exists取代Distinct取唯一值的
+
+   取出关联表部门对员工时,这时取出员工部门时,出现多条..
+select distinct di.dept_name
+  from departments_info di --部门表
+      ,user_info        ui --员工信息表
+where ui.dept_no = di.dept_no
+   可以修改成
+  select di.dept_name
+    from departments_info di --部门表
+   where  exists (select 'X'
+            from user_info ui --员工信息表
+           where di.dept_no = ui.dept_no)
+6、用表连接代替Exists
+   通过表的关联来代替exists会使执行更有效率
+select ui.user_name
+  from user_info ui--员工信息表
+where exists (select 'x '
+          from departments_info di--部门表
+         where di.dept_no = ui.dept_no
+           and ui.dept_cat = 'IT');
+执行是比较快,但还可以使用表的连接取得更快的查询效率
+   select ui.user_name
+    from departments_info di
+        ,user_info        ui --员工信息表
+   where ui.dept_no = di.dept_no
+     and ui.department_type_code = 'IT'
+
+代码是经测试并进行优化所写,
+以上只例子,具体使用还是要针对各个不同的具体的业务使用用Exists(Not Exists)代替In(Not In)
+
+四、索引篇
+
+1、运算导致的索引失效
+
+select di.description student_name
+      ,(select res.order_num--排名
+         from result res
+        where res.student_id = di.student_id
+        order by result_math) order_num
+  from description_info di
+      ,student_info     si --学生信息表
+where si.student_id = di.lookup_code(+)
+   and di.lookup_type(+) = 'STUDENT_ID'
+   and si.student_id+0=100/*student_id索引将失效*/
+  
+2、类型转换导致的索引失效
+
+select di.description student_name
+      ,(select res.order_num--排名
+         from result res
+        where res.student_id = di.student_id
+        order by result_math) order_num
+  from description_info di
+      ,student_info     si --学生信息表
+where si.student_id = di.lookup_code(+)
+   and di.lookup_type(+) = 'STUDENT_ID'
+   and di.student_id='100'
+ 
+student_id为number类型的索引,当执行下列语句,
+oracle会自动转换成
+select di.description student_name
+      ,(select res.order_num--排名
+         from result res
+        where res.student_id = di.student_id
+        order by result_math) order_num
+  from description_info di
+      ,student_info     si --学生信息表
+where si.student_id = di.lookup_code(+)
+   and di.lookup_type(+) = 'STUDENT_ID'
+   and di.student_id=to_number('100')
+所幸,只是解析并转换类型,并没有导到失效,
+但要是写成下面,将会使用其失效
+select di.description student_name
+      ,(select res.order_num--排名
+         from result res
+        where res.student_id = di.student_id
+        order by result_math) order_num
+  from description_info di
+      ,student_info     si --学生信息表
+where si.student_id = di.lookup_code(+)
+   and di.lookup_type(+) = 'STUDENT_ID'
+   and to_char(di.student_id)='100'
+  
+3、在索引列上进行计算引起的问题
+
+select di.description student_name
+      ,(select res.order_num--排名
+         from result res
+        where res.student_id = di.student_id
+        order by result_math) order_num
+  from description_info di
+      ,student_info     si --学生信息表
+where si.student_id = di.lookup_code(+)
+   and di.lookup_type(+) = 'STUDENT_ID'
+   and di.student_id-2=10
+在索引列中进行运算,将会不使用索引而使用全表扫描
+而将
+select di.description student_name
+      ,(select res.order_num--排名
+         from result res
+        where res.student_id = di.student_id
+        order by result_math) order_num
+  from description_info di
+      ,student_info     si --学生信息表
+where si.student_id = di.lookup_code(+)
+   and di.lookup_type(+) = 'STUDENT_ID'
+   and di.student_id=10+2
+将会得到高效的运行速度
+
+4、 Is not null引起的问题(student_id为索引)
+
+不要把存在空值的列做为索引,否则无法使用索引
+select ui.user_name
+  from user_info ui--员工信息表
+  where ui.student_id is not null--索引失效
+ 
+select ui.user_name
+  from user_info ui--员工信息表
+  where ui.student_id>=-1--索引有效
+
+5、Order by导致索引失效(student_id为索引)
+
+select ui.user_name
+  from user_info ui--员工信息表
+  group by ui.student_id  
+而使用
+select ui.user_name
+  from user_info ui--员工信息表
+  where ui.student_id>=-1
+  将使其有效,
+  在order by中只存在两种条件下可以使用索引
+  (ORDER BY中所有的列必须包含在相同的索引中并保持在索引中的排列顺序
+ORDER BY中所有的列必须定义为非空. )
+ 
+6、自动选择索引
+ 
+如果表中有两个以上（包括两个）索引，其中有一个唯一性索引，而其他是非唯一性．
+在这种情况下，ORACLE将使用唯一性索引而完全忽略非唯一性索引．
+
+7、 !=导致索引失效
+ 
+select ui.user_name
+  from user_info ui--员工信息表
+  where ui.student_id!=0
+在Where中使用!=将会把索引失效
+
+8、%导致的索引失效
+
+select di.description student_name
+      ,(select res.order_num--排名
+         from result res
+        where res.student_id = di.student_id
+        order by result_math) order_num
+  from description_info di
+      ,student_info     si --学生信息表
+where si.student_id = di.lookup_code(+)
+   and di.lookup_type(+) = 'STUDENT_ID'
+   and di.look_code Like '%12'/*look_code为索引,索引将失效*/
+而
+select di.description student_name
+      ,(select res.order_num--排名
+         from result res
+        where res.student_id = di.student_id
+        order by result_math) order_num
+  from description_info di
+      ,student_info     si --学生信息表
+where si.student_id = di.lookup_code(+)
+   and di.lookup_type(+) = 'STUDENT_ID'
+   and di.look_code Like '12%'/*索引有效*/
+以上只例子,具体还是要针对各个不同的具体的业务使用
+
+五、oracle 中的not Exists与Not in的性能巨大差异
+
+Not Exists与Not in的作用同样是排除数据,在oracle 中使用not in并不象mysql中的执行那么快,如(
+select jt1.doc_num --单据号码
+      ,oalc.description school_name --学校名称
+      ,oalc2.description system_name --系名称
+      ,oalc.description class_name --班级名称
+  from java_table1            jt1
+      ,java_table_description oalc
+      ,java_table_description oalc2
+      ,java_table_description oalc3
+where oalc.lookup_type(+) = 'JAVA_SCHOOL_NAME'
+   and jt1.school_id = oalc.lookup_code(+)
+   and oalc2.lookup_type(+) = 'JAVA_SYSTEM_NAME'
+   and jt1.system_id = oalc2.lookup_code(+)
+   and oalc3.lookup_type(+) = 'JAVA_CLASS_NAME'
+   and jt1.class_id = oalc3.lookup_code(+)
+   and not exists
+(select jt2.header_id
+          from java_table2 jt2 jt1.header_id = jt2.header_id))
+
+与
+
+select jt1.doc_num --单据号码
+      ,oalc.description school_name --学校名称
+      ,oalc2.description system_name --系名称
+      ,oalc.description class_name --班级名称
+  from java_table1            jt1
+      ,java_table_description oalc
+      ,java_table_description oalc2
+      ,java_table_description oalc3
+where oalc.lookup_type(+) = 'JAVA_SCHOOL_NAME'
+   and jt1.school_id = oalc.lookup_code(+)
+   and oalc2.lookup_type(+) = 'JAVA_SYSTEM_NAME'
+   and jt1.system_id = oalc2.lookup_code(+)
+   and oalc3.lookup_type(+) = 'JAVA_CLASS_NAME'
+   and jt1.class_id = oalc3.lookup_code(+)
+   and jt1.header_id not in (select jt2.header_id from java_table2 jt2)
+
+当jt2表中的数据比较大时,就会出现巨大的差异,以上只能是我的个人理解与测试结果(java_table1 视图测试
+
+数据量为36749,java_table2 为300条),如有其它可相互讨论

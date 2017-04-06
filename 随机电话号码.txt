@@ -1,0 +1,50 @@
+create or replace function my_mobile_num
+     return varchar2
+     is
+     v_mobile varchar2(50);
+     TYPE segnum IS VARRAY (35) OF VARCHAR2 (3);
+     segnum_set   segnum := segnum ('133',
+                                 '153',
+                                 '180',
+                                 '181',
+                                 '189',
+                                 '177',
+                                 '130',
+                                 '131',
+                                 '132',
+                                 '155',
+                                 '156',
+                                 '145',
+                                 '185',
+                                 '186',
+                                 '176',
+                                 '134',
+                                 '135',
+                                 '136',
+                                 '137',
+                                 '138',
+                                 '139',
+                                 '150',
+                                 '151',
+                                 '152',
+                                 '158',
+                                 '159',
+                                 '182',
+                                 '183',
+                                 '184',
+                                 '157',
+                                 '187',
+                                 '188',
+                                 '147',
+                                 '178',
+                                 '170');
+     v_name1 nvarchar2(20);
+     v_name2 nvarchar2(20);
+      v_name3 nvarchar2(20);
+     begin
+           select segnum_set(trunc(dbms_random.value(1,35))) into v_name1 from dual;
+           select substr(cast(dbms_random.value as varchar2(38)),3,4)  into v_name2  from dual;
+           select substr(cast(dbms_random.value as varchar2(38)),3,4)  into v_name3  from dual ;
+      v_mobile:=v_name1||v_name2||v_name3;
+        return v_mobile;
+     end;

@@ -1,0 +1,181 @@
+ORACLE 如何产生一个随机数:DBMS_RANDOM
+
+--1、小数( 0 ~ 1)
+
+     select dbms_random.value from dual ;
+
+--2、指定范围内的小数 ( 0 ~ 100 )
+     select dbms_random.value(0,100) from dual ;
+
+
+--3、指定范围内的整数 ( 0 ~ 100 )
+
+     select trunc(dbms_random.value(0,100)) from dual ;
+
+--4、长度为20的随机数字串
+
+     select substr(cast(dbms_random.value as varchar2(38)),0,10) from dual ;
+
+--5、正态分布的随机数
+
+     select dbms_random.normal from dual ;
+
+--6、随机字符串
+
+     select dbms_random.string('x', 3) from dual ;
+
+     /* opt可取值如下：
+      'u','U'    :    大写字母
+      'l','L'    :    小写字母
+      'a','A'    :    大、小写字母
+      'x','X'    :    数字、大写字母
+      'p','P'    :    可打印字符*/
+
+--7、随机日期
+
+     select to_date(2454084+TRUNC(DBMS_RANDOM.VALUE(0,365)),'J') from dual ;
+
+   /* 通过下面的语句获得指定日期的基数*/
+
+     select to_char(sysdate,'J') from dual ;
+
+--8、生成GUID
+
+     select sys_guid() from dual ;
+
+--生成带分隔符(-)的GUID的自定义函数
+--create or replace function my_guid
+return varchar2
+is
+    guid varchar(36);
+    temp varchar(32);
+begin
+    temp:=sys_guid();
+    guid:= substr(temp,1,8) || '-'
+         ||substr(temp,9,4) || '-'
+         ||substr(temp,13,4)|| '-'
+         ||substr(temp,17,4)|| '-'
+         ||substr(temp,21,12);
+    return guid;
+end;
+
+1.准备工作
+
+login sqlplus as sys
+then run the script
+$ORACLE_HOME/RDBMS/ADMIN/dbmsrand.sql
+
+2.应用举例
+
+SELECT DBMS_RANDOM.RANDOM FROM DUAL;
+
+再进一步的要求，比如，产生一个0－100的随机数，稍微变通一下就可以了：
+
+select abs(mod(dbms_random.random,100)) from dual
+
+3.进阶说明
+
+dbms_random又有新函数了可以实现这些功能
+FUNCTION value RETURN NUMBER;
+FUNCTION value (low IN NUMBER, high IN NUMBER) RETURN NUMBER;
+FUNCTION normal RETURN NUMBER;
+FUNCTION string (opt char, len NUMBER) RETURN VARCHAR2;
+
+产生N到M之间的随机数
+SELECT DBMS_RANDOM.VALUE(N,M) FROM DUAL;
+
+缺省DBMS_RANDOM.VALUE返回0到1之间的随机数
+
+NORMAL函数返回服从正态分布的一组数。此正态分布标准偏差为1，期望值为0。这个函数返回的数值中有68%是介于-1与+1之间，95%介于-2与+2之间，99%介于-3与+3之间。
+最后，是STRING函数。它返回一个长度达60个字符的随机字符串。
+
+用DBMS_RANDOM生成文本和日期值
+
+作者： Bob Watkins
+2006-06-09 04:51 PM
+
+数字、文本字符串和日期都是用户会在表格里碰到的三种常见数据类型。虽然你可以用PL／SQL程序包里的DBMS_RANDOM随机生成数字——它确实能够做到这一点——它还能够随机生成文本和日期值。
+
+1.产生随机数字
+就让我们先从数字开始。VALUE函数会返回一个大于等于0但是小于1的数，精度是38位。
+
+SELECT DBMS_RANDOM.VALUE FROM DUAL;
+
+对于指定范围内的整数，要加入参数low_value和high_value，并从结果中截取小数（最大值不能被作为可能的值）。所以对于0到99之间的整数，你要使用下面的代码：
+
+SELECT TRUNC(DBMS_RANDOM.VALUE(0, 100)) FROM DUAL;
+
+2.产生随机文本字符串
+要随机生成文本字符串，就要使用STRING函数并编写代码指定字符串的类型和所希望的长度：
+
+SELECT DBMS_RANDOM.STRING('A', 20) FROM DUAL;
+
+类型代码在《Oracle Database 10g PL／SQL程序包和类型参考（Oracle Database 10g PL/SQL Packages and Types Reference）》有说明。
+
+下面是一些类型的代码：
+
+‘U’用来生成大写字符
+
+‘L’用来生成小写字符
+
+‘A’用来生成大小写混合的字符
+
+3.产生随机日期
+Oracle将日期作为过去某个关键日期（如果你好奇的话，我可以告诉你这个日期是公元前4712年1月1日）的整数偏移量来保存。这就意味着你可以通过寻找与你希望的起始日期相对应的整数，然后向它加入一个随机的整数来随机生成一个指定范围内的日期。
+
+使用TO_CHAR函数和‘J’格式代码，你可以为今天的日期生成一个内部日期数：
+
+SELECT TO_CHAR(SYSDATE, 'J') FROM DUAL;
+
+例如，要生成一个2003年内的任意日期，你可以首先确定2003年1月1日的日期整数；
+
+SELECT TO_CHAR(TO_DATE('01/01/03','mm/dd/yy'),'J')FROM DUAL;
+
+系统给的结果是2452641。所以要生成该年度内的任意日期，我们就要用带有low_value等于2452641和high_value等于2452641+364参数的DBMS_RANDOM.VALUE，再把它转换成日期：
+
+ 
+
+SELECT TO_DATE(TRUNC(DBMS_RANDOM.VALUE(2452641,2452641+364)),'J') FROM DUAL;
+
+列表A：
+
+SQL> CREATE TABLE random_stuff (
+2     id   NUMBER,
+3     date1 DATE,
+4     text1 VARCHAR2(40)
+5     );
+
+Table created.
+
+SQL> INSERT INTO random_stuff
+2     SELECT
+3        ROWNUM,
+4        TO_DATE(TRUNC(DBMS_RANDOM.VALUE(2452641,2452641+364)),'J'),
+5        DBMS_RANDOM.STRING('A',TRUNC(DBMS_RANDOM.VALUE(6,41)))
+6     FROM user_objects
+7     WHERE ROWNUM < 101;
+
+100 rows created.
+
+SQL> commit;
+
+Commit complete.
+
+SQL> SELECT *
+2 FROM random_stuff
+3 WHERE ROWNUM < 11;
+
+        ID DATE1     TEXT1                                                     
+---------- --------- ----------------------------------------                  
+         1 21-JAN-03 gAwQdhHSLBnu                                              
+         2 28-SEP-03 cESSyTtblabklMGznSHj                                      
+         3 22-NOV-03 nrnsGZCniTY                                               
+         4 05-FEB-03 WCrFojHkic                                                
+         5 10-SEP-03 vlSliCaNQxZsBHbvKfiGnEMoXarR                              
+         6 13-JUN-03 UnYLsIFOvkVezXJTByOpqVgwVSLKDFvvApIR                      
+         7 02-JAN-03 WXffJhdxXN                                                
+         8 03-OCT-03 QimEpqGkVvNBJvZdwzegqgeYXUSEKJE                           
+         9 14-JUL-03 pJlmGZeNNIfSEJFgIdNuRKnCFIzzLMOlXmvC                      
+        10 24-DEC-03 JNnLJlndDcv                                               
+
+10 rows selected.列表A把上面的代码集中到了一起。它创建了一个叫做random_stuff的示例表格，这个表格有三个数据列：ID、date1和text1。它然后联合使用 ROWNUM和DBMS_RANDOM生成数据，在里面插入100个数据行。你可以使用任意至少带有100个数据行的表格进行子查询，因为真正表格里的数据列都不在SELECT列表里。

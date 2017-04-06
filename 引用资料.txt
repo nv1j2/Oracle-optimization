@@ -1,0 +1,29 @@
+优化数据库大幅度提高Oracle的性能 - 编程综合 - Tech - ITeye
+http://www.iteye.com/topic/1118860
+
+
+java mysql大数据量批量插入与流式读取分析  
+http://www.cnblogs.com/xhan/p/3958521.html
+
+
+《收获,不止Oracle》    梁敬彬  梁敬宏 著  电子工业出版社 2013年5月第一次印刷
+
+
+深入理解Oracle的并行操作(原创)----czmmiao
+http://czmmiao.iteye.com/blog/1487568
+
+SQL优化的本质
+https://ask.hellobi.com/blog/sqlcode/2469
+
+
+Oracle优化配置指南 
+http://blog.csdn.net/jinwanmeng/article/details/8101641
+
+Oracle优化经验谈─运行速度优化与内存配置
+http://www.52ij.com/jishu/db/12398.html
+
+oracle优化常用经典参考
+http://blog.itpub.net/29119536/viewspace-1138006/
+
+oracle中sql语句的优化
+http://www.cnblogs.com/netjxz/archive/2009/09/21/1570991.html
